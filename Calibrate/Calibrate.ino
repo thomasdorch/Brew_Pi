@@ -10,6 +10,7 @@ float objectWeight = 0;
 float objectDensity = 1;
 float gravity = 1;
 boolean calibrated = false;
+boolean stopSerial = false;
 
 void setup() {
   Serial.begin(57600);
@@ -50,13 +51,21 @@ void loop() {
       Serial.println(objectDensity); 
       calibrated = true;
     }
+    if(input == '`'){
+      Serial.print("Offset :");
+      Serial.println(scale.get_offset());
+      Serial.end();
+      Serial.flush(); 
+      stopSerial = true;
+      
+    }
   }
   
   gravity = objectDensity * (objectWeight - weight) / objectWeight;
   
-  if(calibrated){
-    Serial.print("("); 
-    Serial.print(gravity);
-    Serial.println(")");
-  }
+//  if( calibrated && !stopSerial ){
+//    Serial.print("("); 
+//    Serial.print(gravity);
+//    Serial.println(")");
+//  }
 }

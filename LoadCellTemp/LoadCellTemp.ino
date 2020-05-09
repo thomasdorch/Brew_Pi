@@ -7,23 +7,45 @@
 HX711 scale;
 
 float calibration_factor = 3195;  //For the load cell
- 
+float offset;
+char inputChar;
+String inputString = "";
+
 //TMP36 Pin Variables
 int tempPin = 1;        //the analog pin the TMP36's Vout (sense) pin is connected to
                         //the resolution is 10 mV / degree centigrade with a
                         //500 mV offset to allow for negative temperatures
 int tempReading;        // the analog reading from the sensor
 
+boolean initialized = false;
+
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(57600);
+  Serial.println('`');
+  
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
   scale.set_scale(-3195.f);
-  scale.tare();  //Reset the scale to 0+
 
   analogReference(EXTERNAL);  //For temp sensor 
+  
 }
 
 void loop() {
+  while(!initialized){
+    while(Serial.available()){
+      
+      inputChar = Serial.read();
+      
+      if (inputChar != '`'){
+        inputString += (char) inputChar;
+      }else{
+        offset = float(inputString);  
+      }
+    }
+    
+  }
+  scale.set_offset(offset);  //Reset the scale to 0+
+    
   //Reading hydrometer first:
    //Adjust to this calibration factor
 
@@ -49,7 +71,7 @@ void loop() {
   Serial.print(gravity,3);
   Serial.println("]");
  
-  scale.power_down();
-  delay(1000);
-  scale.power_up();
+//  scale.power_down();
+//  delay(1000);
+//  scale.power_up();
 }

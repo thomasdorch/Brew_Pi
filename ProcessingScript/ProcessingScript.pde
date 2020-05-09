@@ -5,6 +5,7 @@ import controlP5.*;
 import org.gicentre.utils.stat.*;
 import java.lang.ProcessBuilder;
 import java.text.DecimalFormat;
+import java.nio.ByteBuffer;
 
 
 
@@ -26,6 +27,7 @@ DecimalFormat gravityFormat;
 Serial arduino;
 String mainPath = "/home/pi/Desktop/LoadCellTemp";
 String calPath = "/home/pi/Desktop/Calibrate";
+
 
 final int MIN_PER_HOUR = 60;
 final int SEC_PER_MIN = 60;
@@ -51,6 +53,7 @@ float startTime;
 boolean intervalChanged= false;
 float objectWeight = 101.06;
 float objectDensity = 4.9;
+Float offset;
 String arduinoOutput;
 String arduinoInput;
 boolean calibrate = false;
@@ -161,7 +164,7 @@ void setup() {
     timer = new Timer(2000);
     timersync = new Timer(4000);
     
-    Initialize(calPath,port);
+    Initialize(calPath, port);
     timersync.start();
     println("start upload");
     
@@ -183,10 +186,19 @@ void draw() {
    
   //Get the serial data from the Arduino, ending at the ']' character 
 
-  value = arduino.readStringUntil(']');
+  value = arduino.readStringUntil('\n');
   //print("counter: "); println(counter);
   //print("value: "); println(value);
   if (value != null){ //<>//
+    
+    if (value.contains("`")){
+      arduino.write('`');
+      println("message from load cell sketch recieved");
+      
+      arduino.write(offset.toString());
+      arduino.write('`');
+      
+    }
 
     //Instead of syncing up the start of the serial input with the Arduino, 
     //just start recording at the second packet.
@@ -222,16 +234,20 @@ void draw() {
     }
   }else{
     arduinoOutput = arduino.readStringUntil('\n');
+    
     if ( arduinoOutput != null) {
       output.setText(arduinoOutput);
       if ( arduinoOutput.contains("Object weight set to: ") ) {
         objectWeight = Float.parseFloat(arduinoOutput.substring(arduinoOutput.indexOf(':') + 2, arduinoOutput.indexOf('\n'))); 
       }
       if ( arduinoOutput.contains("Object density set to: ") ) {
-        objectDensity =  Float.parseFloat(arduinoOutput.substring(arduinoOutput.indexOf(':') + 2, arduinoOutput.indexOf('\n'))); 
- 
+        objectDensity =  Float.parseFloat(arduinoOutput.substring(arduinoOutput.indexOf(':') + 2, arduinoOutput.indexOf('\n')));
+        arduino.write('`');
+      }
+      if ( arduinoOutput.contains("Offset: ")){
+        offset = Float.parseFloat(arduinoOutput.substring(arduinoOutput.indexOf(':') + 2, arduinoOutput.indexOf('\n')));
         calibrate = true;
-        output.setText("Calibrated! \n Object Density: " + Float.toString(objectDensity) + ", Object Weight set to: " + objectWeight);
+        output.setText("Calibrated! \n Object Density: " + Float.toString(objectDensity) + ", Object Weight: " + objectWeight);
         
         closeArduino();
         timersync.start();
@@ -243,7 +259,7 @@ void draw() {
         
         openArduino();
       }
-    }
+     }
     if(arduinoInput != null) {
         arduino.write(arduinoInput);
         arduinoInput = null;
@@ -302,9 +318,16 @@ void closeArduino(){
 }
 
 void openArduino() {
+  if (arduino != null){
+    closeArduino();
+    timersync.start();
+    while(!timersync.isFinished()){}
+  }
   println("opening");
+
   arduino = new Serial(this, Serial.list()[1], 57600);
-  arduino.bufferUntil(']');
+  arduino.bufferUntil('\n');
+
 }
 
 void Reset() {
