@@ -1,0 +1,19 @@
+0) Make sure no weight is hanging off of the screws before calibrating
+
+1) Go to LoadCellTemp/Calibrate and run Calibrate.ino. 
+	Click the right arrow button next to the check mark and wait for it to say
+	"Uploaded" above the bottom command line.
+
+2) Press CTRL-SHIFT-M to open the serial monitor (or by pressing the 
+	magnifying glass icon), then follow the instructions: wait for it to start, 
+	place weight on screws, then hit 'w' and press enter. 
+	Then submerge the weight (but not screws) in water, and enter 'a'.
+**Record the values of object density and object weight and add them to the file 
+	"Weight Properties" for reference
+**The scale is now calibrated. Close out of the serial monitor and close the file.
+
+3) Navigate to LoadCellTemp and run the file "LoadCellTemp.ino". 
+	All you need to do is upload the file by clicking that right arrow,
+	wait for it to say "Uploaded" and close the file.
+
+4) Now open the file called Instrument and 
