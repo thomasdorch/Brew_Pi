@@ -1,19 +1,30 @@
-import java.util.*;
-//final int MIN_PER_HOUR = 60;
-//final int SEC_PER_MIN = 60;
+//Returns either the time as a decimal number (for plotting) or as a string timestamp depending on the input arguments
 
-public float getTime(Calendar timeStamp) {
-  String timeString = timeStamp.getTime().toString();
+public float getTime(int hour, int min, int sec, char format) {
+  float shortTime;
   
-  int secIndex = timeString.lastIndexOf(':') + 1;
-  int sec = Integer.parseInt(timeString.substring(secIndex, secIndex + 2));
+  if (format == 'm') {
+    
+    shortTime = ((float) hour*MIN_PER_HOUR) + ((float) min) + ((float) sec/SEC_PER_MIN);
+    
+  }else if (format == 'h'){
+    
+    shortTime = ((float) hour) + ((float) min/MIN_PER_HOUR) + ((float) sec/SEC_PER_MIN/MIN_PER_HOUR);
+    
+  }else{
+    
+    shortTime = 0; //Error
+    println("Time format incorrect");
+    
+  }
   
-  int minIndex = secIndex - 3;
-  int min = Integer.parseInt(timeString.substring(minIndex, minIndex + 2));
+  return shortTime;
   
-  int hourIndex = minIndex - 3;
-  int hour = Integer.parseInt(timeString.substring(hourIndex, hourIndex + 2));
+}
+
+public String getTime(int month, int day, int hour, int min, int sec){
   
-  float time = ((float) hour*MIN_PER_HOUR) + ((float) min) + ((float) sec/SEC_PER_MIN);
-  return time;
+  String fullTime = String.format("%d %d, %d:%d:%d",month,day,hour,min,sec);
+  return fullTime;
+  
 }

@@ -10,7 +10,7 @@ import java.text.DecimalFormat;
 ControlP5 control;
 Textarea tempField;
 Textarea gravityField;
-Textarea output;
+Textarea ArduinoOutputArea;
 Textfield Interval;
 Textfield input;
 XYChart tempPlot;
@@ -18,7 +18,8 @@ XYChart gravPlot;
 Calendar timeStamp;
 Timer dataTimer;
 Timer uploadTimer;
-DecimalFormat gravityFormat;
+DecimalFormat threeDecimals;
+DecimalFormat twoDecimals;
 
 //Initialize Arduino connection
 Serial arduino;
@@ -45,17 +46,21 @@ float timeInterval = 0.02;
 float div;
 
 float currentTime;
-float startTime;
+float currentTimeRelative;
+float startTime_inMinutes;
+float startTime_inHours;
 
 float objectWeight;
 float objectDensity;
 Float offset;
-String arduinoOutput;
-String arduinoInput;
+String rawArduinoOutput;  //Actual output from Arduino
+String consoleText;  //Arduino and system output to display in message window
+String rawArduinoInput;  //Actual input to Arduino
 
-boolean intervalChanged= false;
+boolean intervalChanged = false;
 boolean calibrated = false;
 int counter = -1;
+boolean inHours = false;
 
 //File to save data to
 File file = new File("/home/pi/Desktop/Brew_Pi/log/data.txt");
@@ -67,7 +72,8 @@ void setup() {
     font = createFont("Cambria Math", 14);
     tempPlot = new XYChart(this);
     gravPlot = new XYChart(this);
-    gravityFormat = new DecimalFormat("0.000");
+    threeDecimals = new DecimalFormat("0.000");
+    twoDecimals = new DecimalFormat("0.00");
     
     ControlP5 control = new ControlP5(this);
     tempField = control.addTextarea("temp")
@@ -121,7 +127,7 @@ void setup() {
      .getCaptionLabel().align(ControlP5.CENTER, ControlP5.CENTER).setColor(color(0)).toUpperCase(false)
      ;
      
-    output =  control.addTextarea("output")
+    ArduinoOutputArea =  control.addTextarea("ArduinoOutputArea")
                     .setPosition(450,25)
                     .setSize(300,50)
                     .setFont(font)
@@ -129,9 +135,11 @@ void setup() {
                     .setColorValue(0)
                     .setColorBackground(color(209))
                     .setColorForeground(color(209))
+                    .setScrollForeground(color(0))
+                    .setScrollBackground(color(200))
                     ;
                     
-    input = control.addTextfield("input");
+    input = control.addTextfield("ArduinoInputField");
     input.setPosition(450,80)
          .setSize(300,18)
          .setAutoClear(false)
@@ -141,6 +149,7 @@ void setup() {
          .setColorBackground(color(209))
          .setColorForeground(color(209))
          .setColorActive(color(209))
+         .setColorCursor(color(0))
          ;
                      
     tempPlot.setLineColour(color(50,200,200));
@@ -175,75 +184,107 @@ void setup() {
   
     
     dataTimer.start();
-    thread("updateData");
+    //thread("updateData");
 }
 
 void draw() {
   
   if (calibrated) {
 
-  value = arduino.readStringUntil('\n');
-  //print("counter: "); println(counter);
-  //print("value: "); println(value);
-  if (value != null){
-    if (value.contains("`")){
-      println("message from load cell sketch recieved");
-
-      arduino.write(offset.toString());
-      arduino.write('`');
-      value = null;
-    }
-
-    else if (value.contains("[") && value.contains("]")){
+    value = arduino.readStringUntil('\n');
+    //print("counter: "); println(counter);
+    //print("value: "); println(value);
+    if (value != null){
       
-      temp = value.substring(value.indexOf("[") + 1, value.indexOf(","));
-      weight = value.substring(value.indexOf(",") + 2, value.indexOf("]") - 1);
-
-      tempField.setText("Temperature: " + temp + " \u00B0C");
-      gravity = objectDensity * ( objectWeight - Float.parseFloat(weight) ) / objectWeight;
-      gravityField.setText("Gravity: " + gravityFormat.format(gravity));
-      
-      if(intervalChanged){
-        int timerValue = (int) (timeInterval*60000);
-        dataTimer.setValue(timerValue);
-        intervalChanged = false;
-      }
-        
-      if (dataTimer.isFinished()){
-        output.setText("Reading...");
-        updateData();
-        dataTimer.start();
-      }
-    }
-  }
-  //Set counter to 0 to indicate that the first packet has been skipped
-  if (counter < 0){
-      timeStamp = Calendar.getInstance();
-      currentTime = getTime(timeStamp);
-      startTime = currentTime;
-      print("start time: "); println(startTime);
-      print("current time: "); println(currentTime);
-      counter = 0;
-    }
-  }else{
-    arduinoOutput = arduino.readStringUntil('\n');
-    
-    if ( arduinoOutput != null) {
-      output.setText(arduinoOutput);
-      if ( arduinoOutput.contains("Object weight set to: ") ) {
-        objectWeight = Float.parseFloat(arduinoOutput.substring(arduinoOutput.indexOf(':') + 2, arduinoOutput.indexOf('\n'))); 
-      }
-      if ( arduinoOutput.contains("Object density set to: ") ) {
-        objectDensity =  Float.parseFloat(arduinoOutput.substring(arduinoOutput.indexOf(':') + 2, arduinoOutput.indexOf('\n')));
+      if (value.contains("`")){
+        println("message from load cell sketch recieved");
+  
+        arduino.write(offset.toString());
         arduino.write('`');
+        value = null;
       }
-      if ( arduinoOutput.contains("Offset: ")){
-        offset = Float.parseFloat(arduinoOutput.substring(arduinoOutput.indexOf(':') + 2, arduinoOutput.indexOf('\n')));
+  
+      //Parses serial putput from the Arduino and adds it to the plot/log file
+      else if (value.contains("[") && value.contains("]")){
+        
+        temp = value.substring(value.indexOf("[") + 1, value.indexOf(","));
+        weight = value.substring(value.indexOf(",") + 2, value.indexOf("]") - 1);
+  
+        tempField.setText("Temperature: " + temp + " \u00B0C");
+        gravity = objectDensity * ( objectWeight - Float.parseFloat(weight) ) / objectWeight;
+        gravityField.setText("Gravity: " + threeDecimals.format(gravity));
+        
+        //If the interval between measurements has elapsed, change the value of the dataTimer
+        if(intervalChanged){
+          int timerValue = (int) (timeInterval*60000);
+          dataTimer.setValue(timerValue);
+          intervalChanged = false;
+        }
+          
+        if (dataTimer.isFinished()){
+          
+          //Set counter to 0 to indicate that the first packet has been skipped and gets sets the start time
+          if (counter < 0){
+            
+            int hour = hour();
+            int min = minute();
+            int sec = second();
+            
+            currentTime = getTime(hour,min,sec,'m');
+            startTime_inMinutes = currentTime;
+            startTime_inHours = getTime(hour,min,sec,'h');
+            
+            print("start time: "); println(startTime_inMinutes);
+            print("current time: "); println(currentTime);
+            
+            counter = 0;
+            dataTimer.start();
+            
+          }else{
+          
+            updateData();
+            dataTimer.start();
+            
+            if ( (inHours == false) && (!( abs(timeInterval - div) < 0.03 ) && (div != 0))  ){
+              timeInterval = div;
+              Interval.setText(twoDecimals.format(div));
+              println("Interval set");
+            }
+          }
+       }
+      }
+    }
+    
+  }else{
+    rawArduinoOutput = arduino.readStringUntil('\n');
+
+    if ( rawArduinoOutput != null) {
+      
+      if (consoleText != null){
+        consoleText = consoleText + rawArduinoOutput; 
+        
+      }else {
+        consoleText = rawArduinoOutput;
+      }
+      
+      ArduinoOutputArea.setText(consoleText).scroll(1);
+      
+      if ( rawArduinoOutput.contains("Object weight set to: ") ) {
+        objectWeight = Float.parseFloat(rawArduinoOutput.substring(rawArduinoOutput.indexOf(':') + 2, rawArduinoOutput.indexOf('\n'))); 
+      }
+      if ( rawArduinoOutput.contains("Object density set to: ") ) {
+        objectDensity =  Float.parseFloat(rawArduinoOutput.substring(rawArduinoOutput.indexOf(':') + 2, rawArduinoOutput.indexOf('\n')));
+        arduino.write('`');
+        ArduinoOutputArea.setText(consoleText + "Preparing for measurement...");
+      }
+      if ( rawArduinoOutput.contains("Offset: ")){
+        offset = Float.parseFloat(rawArduinoOutput.substring(rawArduinoOutput.indexOf(':') + 2, rawArduinoOutput.indexOf('\n')));
         calibrated = true;
-        output.setText("Calibrated! \n Object Density: " + Float.toString(objectDensity) + ", Object Weight: " + objectWeight);
+        ArduinoOutputArea.setText(consoleText + "Calibrated!"+ "\n");
+        ArduinoOutputArea.setText( "Object Density: " + Float.toString(objectDensity) + ", Object Weight: " + objectWeight);
         
         closeArduino();
-        output.setText("Preparing for measurement...");
+        
         uploadTimer.start();
         while (!uploadTimer.isFinished()){
           ;
@@ -259,10 +300,11 @@ void draw() {
         
         arduino.write('`');
       }
-     } 
-    if(arduinoInput != null) {
-        arduino.write(arduinoInput);
-        arduinoInput = null;
+    }
+    
+    if(rawArduinoInput != null) {
+        arduino.write(rawArduinoInput);
+        rawArduinoInput = null;
       }
   }
 }
@@ -276,35 +318,57 @@ void Enter() {
 }
 
 void updateData(){
-  tempArray = updateArray(tempArray);
-  gravArray = updateArray(gravArray);
-  timeArray = updateArray(timeArray);
-  timeStamp = Calendar.getInstance();
-  currentTime = getTime(timeStamp);
   
-  if(counter>0){
-    
-    tempArray[counter] = Float.parseFloat(temp);
-    gravArray[counter] = gravity;
-    timeArray[counter] = currentTime-startTime;
-    tempPlot.setData(timeArray, tempArray);
-    gravPlot.setData(timeArray, gravArray);
+tempArray = updateArray(tempArray);
+gravArray = updateArray(gravArray);
+timeArray = updateArray(timeArray);
 
-    div = timeArray[counter]- timeArray[counter-1];
-    tempPlot.setYAxisAt(timeArray[counter]+(div*10));
-    gravPlot.setMaxX(timeArray[counter] +(div*10));
-    tempPlot.setMaxX(gravPlot.getMaxX());
-    
-    background(255,255,255);
-    tempPlot.draw(40, 100, 950, 650);
-    gravPlot.draw(40, 100, 950, 650);
-  }
+currentTime = getTime(hour(),minute(),second(),'m');
+//print("currrent time: "); println(currentTime);
+//print("start time(m): "); println(startTime_inMinutes);
+//print("start time(h): "); println(startTime_inHours);
+if ( (currentTime - startTime_inMinutes) < 60 ){
+
+  currentTimeRelative = currentTime - startTime_inMinutes;
   
-  String time = String.format("%d.%d.%d.%d",month(),day(),hour(),minute());
-  //Write the data to a text file
-  String output = temp + ", " + gravity + ", " + time + "\n" ;
-  writeFile(file ,output );
-  counter++;
+} else {
+  
+  currentTime = getTime(hour(),minute(),second(),'h');
+  currentTimeRelative = currentTime - startTime_inHours;
+  
+  if (inHours == false){
+    tempPlot.setXAxisLabel("Time (hours)");
+    gravPlot.setXAxisLabel("Time (hours)");
+    inHours = true;
+  }
+}
+
+if(counter > 0){
+  
+  tempArray[counter] = Float.parseFloat(temp);
+  gravArray[counter] = gravity;
+  timeArray[counter] = currentTimeRelative;
+  tempPlot.setData(timeArray, tempArray);
+  gravPlot.setData(timeArray, gravArray);
+  //print("counter: "); println(counter);
+  //print("time array: "); println(timeArray);
+  div = timeArray[counter]- timeArray[counter-1];
+  
+  tempPlot.setYAxisAt(timeArray[counter]+(div*10));
+  gravPlot.setMaxX(timeArray[counter] +(div*10));
+  tempPlot.setMaxX(gravPlot.getMaxX());
+  
+  background(255,255,255);
+  tempPlot.draw(40, 100, 950, 650);
+  gravPlot.draw(40, 100, 950, 650);
+}
+
+
+String time = getTime(month(),day(),hour(),minute(),second());
+//Write the data to a text file
+String output = temp + ", " + gravity + ", " + time + "\n" ;
+writeFile(file ,output );
+counter++;
 }
 
 void closeArduino(){
@@ -316,15 +380,17 @@ void closeArduino(){
 }
 
 void openArduino() {
+  
   if (arduino != null){
     closeArduino();
     uploadTimer.start();
+    
     while(!uploadTimer.isFinished()){}
   }
+  
   println("opening");
   arduino = new Serial(this, Serial.list()[1], 57600);
   arduino.bufferUntil('\n');
-
 }
 
 void Reset() {
@@ -340,15 +406,16 @@ void Reset() {
   div = 0;
 
   currentTime = 0;
-  startTime = 0;
+  startTime_inHours = 0;
+  startTime_inMinutes = 0;
   intervalChanged = false;
   
   background(255,255,255);
 }
 
-public void input(String text){
-    
-    arduinoInput = text; 
+public void ArduinoInputField(String text){
+  
+    rawArduinoInput = text; 
     input.clear();
-
+    
 }
