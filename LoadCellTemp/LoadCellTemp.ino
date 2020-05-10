@@ -18,33 +18,38 @@ int tempPin = 1;        //the analog pin the TMP36's Vout (sense) pin is connect
 int tempReading;        // the analog reading from the sensor
 
 boolean initialized = false;
+boolean stopSerial = false;
 
 void setup() {
   Serial.begin(57600);
-  Serial.println('`');
+  
   
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
   scale.set_scale(-3195.f);
 
   analogReference(EXTERNAL);  //For temp sensor 
+  Serial.print("`\n");
   
 }
 
 void loop() {
   while(!initialized){
+    
     while(Serial.available()){
       
       inputChar = Serial.read();
       
       if (inputChar != '`'){
         inputString += (char) inputChar;
+        
       }else{
-        offset = float(inputString);  
+        offset = inputString.toFloat();  
+        initialized = true;
+        scale.set_offset(offset);
       }
     }
     
   }
-  scale.set_offset(offset);  //Reset the scale to 0+
     
   //Reading hydrometer first:
    //Adjust to this calibration factor
@@ -65,13 +70,28 @@ void loop() {
   float out[] = {temperatureC,gravity};
   int sizeOut = 2;
   
-  Serial.print("[");
-  Serial.print(temperatureC,1);
-  Serial.print(", ");
-  Serial.print(gravity,3);
-  Serial.println("]");
+  //if (!stopSerial){
+    Serial.print("[");
+    Serial.print(temperatureC,1);
+    Serial.print(", ");
+    Serial.print(gravity,3);
+    Serial.println("]");
+  
+
+//  if (Serial.available()) {
+//    
+//    char in = Serial.read();
+//    if (in == 'x'){
+//      stopSerial = true;
+//      Serial.end();
+//      Serial.flush();
+//    }else {
+//      stopSerial = false;
+//    }
+//  }
+  //}
  
-//  scale.power_down();
-//  delay(1000);
-//  scale.power_up();
+  scale.power_down();
+  delay(1000);
+  scale.power_up();
 }

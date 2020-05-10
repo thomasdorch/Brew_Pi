@@ -5,9 +5,6 @@ import controlP5.*;
 import org.gicentre.utils.stat.*;
 import java.lang.ProcessBuilder;
 import java.text.DecimalFormat;
-import java.nio.ByteBuffer;
-
-
 
 //Initialize GUI controllers
 ControlP5 control;
@@ -19,15 +16,14 @@ Textfield input;
 XYChart tempPlot;
 XYChart gravPlot;
 Calendar timeStamp;
-Timer timer;
-Timer timersync;
+Timer dataTimer;
+Timer uploadTimer;
 DecimalFormat gravityFormat;
 
 //Initialize Arduino connection
 Serial arduino;
-String mainPath = "/home/pi/Desktop/LoadCellTemp";
-String calPath = "/home/pi/Desktop/Calibrate";
-
+String mainPath = "/home/pi/Desktop/brew-pi/LoadCellTemp";
+String calPath = "/home/pi/Desktop/brew-pi/Calibrate";
 
 final int MIN_PER_HOUR = 60;
 final int SEC_PER_MIN = 60;
@@ -35,29 +31,31 @@ String temp;
 String weight;
 float gravity;
 
-int fontSize = 14;
+
 PFont font;
-int counter = -1;
+
 String value = "";
 String time;
 float[] empty = {};
 float[] tempArray = empty;
 float[] gravArray = empty;
 float[] timeArray = empty;
-float timeDelay = 0;
+
 float timeInterval = 0.02;
-float div = 60;
-int delay = 0;
+float div;
+
 float currentTime;
 float startTime;
-boolean intervalChanged= false;
-float objectWeight = 101.06;
-float objectDensity = 4.9;
+
+float objectWeight;
+float objectDensity;
 Float offset;
 String arduinoOutput;
 String arduinoInput;
-boolean calibrate = false;
 
+boolean intervalChanged= false;
+boolean calibrated = false;
+int counter = -1;
 //File to save data to
 File file = new File("/home/pi/Desktop/data.txt");
 String port = Serial.list()[1];
@@ -65,7 +63,7 @@ String port = Serial.list()[1];
 void setup() {
     size(1024,768);
     background(color(255,100));
-    font = createFont("Cambria Math",fontSize);
+    font = createFont("Cambria Math", 14);
     tempPlot = new XYChart(this);
     gravPlot = new XYChart(this);
     gravityFormat = new DecimalFormat("0.000");
@@ -161,65 +159,58 @@ void setup() {
     gravPlot.setYAxisLabel("Specific Gravity");
     gravPlot.setXAxisLabel("Time (minutes)");
              
-    timer = new Timer(2000);
-    timersync = new Timer(4000);
+    dataTimer = new Timer(2000);
+    uploadTimer = new Timer(10000);
     
     Initialize(calPath, port);
-    timersync.start();
-    println("start upload");
+    uploadTimer.start();
     
-    while(!timersync.isFinished()){
-    //wait for timer to finish
+    while(!uploadTimer.isFinished()){
+      ; //wait for timer to finish
     }
-    println("finished uploading");
-    
+
     openArduino();
     arduino.bufferUntil('\n');
-
-    counter = -1; //<>//
-        
+  
+     //<>//
+    dataTimer.start();
     thread("updateData");
 }
 
 void draw() {
-  if (calibrate) {
-   
-  //Get the serial data from the Arduino, ending at the ']' character 
+  
+  if (calibrated) {
 
   value = arduino.readStringUntil('\n');
   //print("counter: "); println(counter);
   //print("value: "); println(value);
   if (value != null){ //<>//
-    
     if (value.contains("`")){
-      arduino.write('`');
       println("message from load cell sketch recieved");
-      
+
       arduino.write(offset.toString());
       arduino.write('`');
-      
+      value = null;
     }
 
-    //Instead of syncing up the start of the serial input with the Arduino, 
-    //just start recording at the second packet.
-    if (counter >= 0){
+    else if (value.contains("[") && value.contains("]")){
       
       temp = value.substring(value.indexOf("[") + 1, value.indexOf(","));
       weight = value.substring(value.indexOf(",") + 2, value.indexOf("]") - 1);
-      print("weight: "); println(weight);
+
       tempField.setText("Temperature: " + temp + " \u00B0C");
-      gravity = objectDensity * (objectWeight -Float.parseFloat(weight)) / objectWeight;
+      gravity = objectDensity * ( objectWeight - Float.parseFloat(weight) ) / objectWeight;
       gravityField.setText("Gravity: " + gravityFormat.format(gravity));
       
       if(intervalChanged){
         int timerValue = (int) (timeInterval*60000);
-        timer.setValue(timerValue);
+        dataTimer.setValue(timerValue);
         intervalChanged = false;
       }
         
-      if (timer.isFinished()){
+      if (dataTimer.isFinished()){
         updateData();
-        timer.start();
+        dataTimer.start();
       }
     }
   }
@@ -246,20 +237,27 @@ void draw() {
       }
       if ( arduinoOutput.contains("Offset: ")){
         offset = Float.parseFloat(arduinoOutput.substring(arduinoOutput.indexOf(':') + 2, arduinoOutput.indexOf('\n')));
-        calibrate = true;
+        calibrated = true;
         output.setText("Calibrated! \n Object Density: " + Float.toString(objectDensity) + ", Object Weight: " + objectWeight);
         
         closeArduino();
-        timersync.start();
-        while (!timersync.isFinished()){}
+        output.setText("Preparing for measurement...");
+        uploadTimer.start();
+        while (!uploadTimer.isFinished()){
+          ;
+        }
         Initialize(mainPath, port);
         
-        timersync.start();
-        while (!timersync.isFinished()){}
+        uploadTimer.start();
+        while (!uploadTimer.isFinished()){
+          ; 
+        }
         
         openArduino();
+        
+        arduino.write('`');
       }
-     }
+     } 
     if(arduinoInput != null) {
         arduino.write(arduinoInput);
         arduinoInput = null;
@@ -289,9 +287,7 @@ void updateData(){
     timeArray[counter] = currentTime-startTime;
     tempPlot.setData(timeArray, tempArray);
     gravPlot.setData(timeArray, gravArray);
-    //print("counter: "); println(counter);
-    //print("timeArray: "); println(timeArray);
-    //print("gravArray: "); println(gravArray);
+
     div = timeArray[counter]- timeArray[counter-1];
     tempPlot.setYAxisAt(timeArray[counter]+(div*10));
     gravPlot.setMaxX(timeArray[counter] +(div*10));
@@ -313,30 +309,23 @@ void closeArduino(){
   
   arduino.stop();
   println("Arduino stopped");
-  timersync.start();
+  uploadTimer.start();
 
 }
 
 void openArduino() {
   if (arduino != null){
     closeArduino();
-    timersync.start();
-    while(!timersync.isFinished()){}
+    uploadTimer.start();
+    while(!uploadTimer.isFinished()){}
   }
   println("opening");
-
   arduino = new Serial(this, Serial.list()[1], 57600);
   arduino.bufferUntil('\n');
 
 }
 
 void Reset() {
-
-  //closeArduino();
-  //while(!timersync.isFinished()){}
-  //Initialize(port); 
-  //timersync.start();
-  //println("start");
   
   counter = -1;
   value = "";
@@ -344,20 +333,15 @@ void Reset() {
   tempArray = empty;
   gravArray = empty;
   timeArray = empty;
-  timeDelay = 0;
+
   timeInterval = 0.02;
-  div = 60;
-  delay = 0;
+  div = 0;
+
   currentTime = 0;
   startTime = 0;
   intervalChanged = false;
   
   background(255,255,255);
-  //while(!timersync.isFinished()){}
-  
-  //println("done");
-  //openArduino();
-  //println("reset");
 }
 
 public void input(String text){

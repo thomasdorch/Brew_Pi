@@ -52,7 +52,7 @@ void loop() {
       calibrated = true;
     }
     if(input == '`'){
-      Serial.print("Offset :");
+      Serial.print("Offset: ");
       Serial.println(scale.get_offset());
       Serial.end();
       Serial.flush(); 
