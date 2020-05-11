@@ -69,16 +69,21 @@ String time;
 float[] empty = {};
 float[] tempArray = empty;
 float[] gravArray = empty;
-float[] timeArray = empty;
+float[] timeArray_inMinutes = empty;
+float[] timeArray_inHours = empty;
 
 float timeInterval = 0.02f;
 float div;
 
-float currentTime;
-float currentTimeRelative;
+float currentTime_inMinutes;
+float currentTime_inHours;
+float currentTimeRelative_inMinutes;
+float currentTimeRelative_inHours;
 float startTime_inMinutes;
 float startTime_inHours;
-
+int days = 0;
+int currentDay;
+int startDay;
 float objectWeight;
 float objectDensity;
 Float offset;
@@ -258,13 +263,14 @@ public void draw() {
             int hour = hour();
             int min = minute();
             int sec = second();
-            
-            currentTime = getTime(hour,min,sec,'m');
-            startTime_inMinutes = currentTime;
+            currentDay = day();
+            startDay = currentDay;
+            currentTime_inHours = getTime(hour,min,sec,'m');
+            startTime_inMinutes = currentTime_inHours;
             startTime_inHours = getTime(hour,min,sec,'h');
             
             print("start time: "); println(startTime_inMinutes);
-            print("current time: "); println(currentTime);
+            print("current time: "); println(currentTime_inHours);
             
             counter = 0;
             dataTimer.start();
@@ -274,11 +280,11 @@ public void draw() {
             updateData();
             dataTimer.start();
             
-            if ( (inHours == false) && (!( abs(timeInterval - div) < 0.03f ) && (div != 0))  ){
-              timeInterval = div;
-              Interval.setText(twoDecimals.format(div));
-              println("Interval set");
-            }
+            //if ( (inHours == false) && (!( abs(timeInterval - div) < 0.03 ) && (div != 0))  ){
+            //  timeInterval = div;
+            //  Interval.setText(twoDecimals.format(div));
+            //  println("Interval set");
+            //}
           }
        }
       }
@@ -350,42 +356,66 @@ public void updateData(){
   
 tempArray = updateArray(tempArray);
 gravArray = updateArray(gravArray);
-timeArray = updateArray(timeArray);
-
-currentTime = getTime(hour(),minute(),second(),'m');
+timeArray_inMinutes = updateArray(timeArray_inMinutes);
+timeArray_inHours = updateArray(timeArray_inHours);
+currentDay = day();
 //print("currrent time: "); println(currentTime);
 //print("start time(m): "); println(startTime_inMinutes);
 //print("start time(h): "); println(startTime_inHours);
-if ( (currentTime - startTime_inMinutes) < 60 ){
 
-  currentTimeRelative = currentTime - startTime_inMinutes;
-  
+currentTime_inMinutes = getTime(hour(),minute(),second(),'m');
+
+currentTime_inHours = getTime(hour(),minute(),second(),'h');
+days = (currentDay-startDay);
+
+if ( currentTime_inHours < startTime_inHours ){
+  currentTimeRelative_inMinutes = ( currentTime_inMinutes ) + days*(24*MIN_PER_HOUR - startTime_inMinutes);
+  currentTimeRelative_inHours = ( currentTime_inHours ) + days*(24 - startTime_inHours);
+
 } else {
-  
-  currentTime = getTime(hour(),minute(),second(),'h');
-  currentTimeRelative = currentTime - startTime_inHours;
-  
-  if (inHours == false){
-    tempPlot.setXAxisLabel("Time (hours)");
-    gravPlot.setXAxisLabel("Time (hours)");
-    inHours = true;
-  }
+  currentTimeRelative_inHours =  currentTime_inHours - startTime_inHours + days*24;
+  currentTimeRelative_inMinutes = currentTime_inMinutes -startTime_inMinutes  + days*24*MIN_PER_HOUR;
+
 }
+
 
 if(counter > 0){
   
   tempArray[counter] = Float.parseFloat(temp);
   gravArray[counter] = gravity;
-  timeArray[counter] = currentTimeRelative;
-  tempPlot.setData(timeArray, tempArray);
-  gravPlot.setData(timeArray, gravArray);
-  //print("counter: "); println(counter);
-  //print("time array: "); println(timeArray);
-  div = timeArray[counter]- timeArray[counter-1];
+  timeArray_inMinutes[counter] = currentTimeRelative_inMinutes;
+  timeArray_inHours[counter] = currentTimeRelative_inHours;
   
-  tempPlot.setYAxisAt(timeArray[counter]+(div*10));
-  gravPlot.setMaxX(timeArray[counter] +(div*10));
-  tempPlot.setMaxX(gravPlot.getMaxX());
+  
+  if (!inHours) {
+    div = timeArray_inMinutes[counter]- timeArray_inMinutes[counter-1];
+    tempPlot.setData(timeArray_inMinutes, tempArray);
+    gravPlot.setData(timeArray_inMinutes, gravArray);
+    tempPlot.setYAxisAt(timeArray_inMinutes[counter]+(div*10));
+    gravPlot.setMaxX(timeArray_inMinutes[counter] +(div*10));
+    tempPlot.setMaxX(gravPlot.getMaxX());
+    
+    if ( abs(currentTime_inMinutes - startTime_inMinutes) > 1 ){
+      
+      tempPlot.setXAxisLabel("Time (hours)");
+      gravPlot.setXAxisLabel("Time (hours)");
+      inHours = true;
+      
+    }
+    
+  }else if (inHours){
+    
+    div = timeArray_inHours[counter]- timeArray_inHours[counter-1];
+    tempPlot.setData(timeArray_inHours, tempArray);
+    gravPlot.setData(timeArray_inHours, gravArray);
+    div = timeArray_inHours[counter]- timeArray_inHours[counter-1];
+    tempPlot.setYAxisAt(timeArray_inHours[counter]+(div*10));
+    gravPlot.setMaxX(timeArray_inHours[counter] +(div*10));
+    tempPlot.setMaxX(gravPlot.getMaxX());
+      
+  }
+
+  
   
   background(255,255,255);
   tempPlot.draw(40, 100, 950, 650);
@@ -429,12 +459,12 @@ public void Reset() {
   time = "";
   tempArray = empty;
   gravArray = empty;
-  timeArray = empty;
+  timeArray_inMinutes = empty;
 
   timeInterval = 0.02f;
   div = 0;
 
-  currentTime = 0;
+  currentTime_inHours = 0;
   startTime_inHours = 0;
   startTime_inMinutes = 0;
   intervalChanged = false;
@@ -529,7 +559,6 @@ public String getTime(int month, int day, int hour, int min, int sec){
   return fullTime;
   
 }
-
 
 
 
