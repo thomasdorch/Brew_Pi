@@ -23,8 +23,8 @@ DecimalFormat twoDecimals;
 
 //Initialize Arduino connection
 Serial arduino;
-String mainPath = "/home/pi/Desktop/Brew_Pi/src/Run_Instrument";
-String calPath = "/home/pi/Desktop/Brew_Pi/src/Calibrate";
+String mainPath = "/home/pi/Desktop/Brew_Pi/arduino_sketches/Run_Instrument";
+String calPath = "/home/pi/Desktop/Brew_Pi/arduino_sketches/Calibrate";
 
 final int MIN_PER_HOUR = 60;
 final int SEC_PER_MIN = 60;
@@ -186,11 +186,11 @@ void setup()
   arduino.bufferUntil('\n');
 
   dataTimer.start();
-  calibrated = true;
+
 }
 
 void draw() 
-{
+{ //<>//
 
   if (calibrated) 
   {
@@ -270,15 +270,11 @@ void draw()
 
       if (consoleText != null) 
       {
-        
         consoleText = consoleText + rawArduinoOutput;
-        
       } 
       else 
       {
-        
-        consoleText = rawArduinoOutput;
-        
+        consoleText = rawArduinoOutput; //<>//
       }
 
       ArduinoOutputArea.setText(consoleText).scroll(1);
@@ -288,14 +284,14 @@ void draw()
         objectWeight = Float.parseFloat(rawArduinoOutput.substring(rawArduinoOutput.indexOf(':') + 2, rawArduinoOutput.indexOf('\n')));
       }
       
-      else if ( rawArduinoOutput.contains("Object density set to: ") ) 
+      if ( rawArduinoOutput.contains("Object density set to: ") ) 
       {
         objectDensity =  Float.parseFloat(rawArduinoOutput.substring(rawArduinoOutput.indexOf(':') + 2, rawArduinoOutput.indexOf('\n')));
         arduino.write('`');
         ArduinoOutputArea.setText(consoleText + "Preparing for measurement...");
       }
       
-      else if ( rawArduinoOutput.contains("Offset: ")) 
+      if ( rawArduinoOutput.contains("Offset: ")) 
       {
         offset = Float.parseFloat(rawArduinoOutput.substring(rawArduinoOutput.indexOf(':') + 2, rawArduinoOutput.indexOf('\n')));
         calibrated = true;
@@ -309,6 +305,7 @@ void draw()
         {
           ;
         }
+        
         Initialize(mainPath, port);
 
         uploadTimer.start();
@@ -316,15 +313,18 @@ void draw()
         {
           ;
         }
-
+        
         openArduino();
+        
         arduino.write('`');
         
       }
-
+      
+    }
+    if (rawArduinoInput != null)
+    {
       arduino.write(rawArduinoInput);
       rawArduinoInput = null;
-      
     }
   }
 }

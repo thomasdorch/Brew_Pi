@@ -63,10 +63,5 @@ void loop() {
   }
   
   gravity = objectDensity * (objectWeight - weight) / objectWeight;
-  
-//  if( calibrated && !stopSerial ){
-//    Serial.print("("); 
-//    Serial.print(gravity);
-//    Serial.println(")");
-//  }
+
 }

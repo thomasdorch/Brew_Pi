@@ -24,7 +24,6 @@ void setup() {
   
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
   scale.set_scale(-3195.f);
-
   analogReference(EXTERNAL);  //For temp sensor 
   Serial.print("`\n");
   
@@ -73,8 +72,8 @@ void loop() {
   Serial.print(", ");
   Serial.print(gravity,3);
   Serial.println("]");
- 
-  scale.power_down();
+
+  //scale.power_down();
   delay(1000);
-  scale.power_up();
+  //scale.power_up();
 }

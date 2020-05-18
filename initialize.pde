@@ -11,7 +11,7 @@ public void Initialize(String dir, String port){
   File logFile = new File("/home/pi/Desktop/Brew_Pi/log/logFile.txt");
   File errorFile = new File("/home/pi/Desktop/Brew_Pi/log/errorFile.txt");
   
-  Timer delay = new Timer(2000);
+  Timer delay = new Timer(3000);
   
   try{
     ProcessBuilder reset = new ProcessBuilder(resetArgs);
