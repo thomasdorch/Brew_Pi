@@ -1,5 +1,5 @@
 # Brew Pi
-This is a project to create a continuous monitor for homebrewing. Currently it runs on a Raspberry Pi and uses an arduino connected via USB to collect data about the brew and display it on a continuous plot. 
+This is a project to create a continuous monitor for homebrewing, written as a final project for CHEM 480 at CSUCi. Currently it runs on a Raspberry Pi and uses an arduino connected via USB to collect data about the brew and display it on a continuous plot. 
 
 The program is written in Processing and requires the Arduino CLI to programatically upload Arduino sketches as needed.
 
@@ -19,6 +19,6 @@ The program is written in Processing and requires the Arduino CLI to programatic
   - Temperature Sensor (TMP36)
   - Electronic Hydrometer (Using Mini Load Cell TAL221 and Load Cell Amplifier HX711)
 
-## Sensors I would like to add in the future
+## Sensors that may be useful in the future
   - pH Sensor 
   - Refractometer
